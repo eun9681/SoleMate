@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#fdf4e3" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Solemate · 내 발에 딱 맞는 신발</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/app-icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="page">
+
+    <!-- ====== SCREEN: 시작 화면 ====== -->
+    <section class="screen active" data-screen="start">
+      <div class="start-wrap">
+        <div class="brand-big"><span class="brand-sole">Sole</span><span class="brand-mate">mate</span></div>
+        <p class="tagline">내 발에 딱 맞는<br/>신발을 찾아드려요</p>
+        <div class="foot-illustration" aria-hidden="true"><img src="icons/solemate-logo.svg" alt=""/></div>
+        <button class="btn-primary" data-go="signup" type="button">회원 가입</button>
+        <button class="btn-secondary" data-go="login" type="button">로그인</button>
+      </div>
+    </section>
+
+    <!-- ====== SCREEN: 회원가입 ====== -->
+    <section class="screen" data-screen="signup">
+      <div class="card-wrap">
+        <div class="brand-small"><img class="brand-icon" src="icons/solemate-logo.svg" alt=""/><span class="brand-sole">Sole</span><span class="brand-mate">mate</span></div>
+        <h1 class="screen-title">회원 가입</h1>
+
+        <label class="field">
+          <span class="field-label">아이디</span>
+          <div class="field-row">
+            <input id="su-id" type="text" class="text-input" autocomplete="off" />
+            <button id="su-check" class="btn-pill" type="button">중복 체크</button>
+          </div>
+          <span id="su-id-msg" class="field-msg"></span>
+        </label>
+        <label class="field"><span class="field-label">비밀번호</span><input id="su-pw" type="password" class="text-input" autocomplete="new-password" /></label>
+        <label class="field"><span class="field-label">비밀번호 확인</span><input id="su-pw2" type="password" class="text-input" autocomplete="new-password" /></label>
+        <label class="field">
+          <span class="field-label">이메일</span>
+          <div class="field-row">
+            <input id="su-email" type="email" class="text-input" autocomplete="email" />
+            <button id="su-send-code" class="btn-pill" type="button">인증 코드 발송</button>
+          </div>
+        </label>
+        <label class="field">
+          <input id="su-code" type="text" class="text-input" placeholder="인증 코드" />
+          <span id="su-code-msg" class="field-msg"></span>
+        </label>
+        <label class="checkbox-row"><input id="su-consent" type="checkbox" /><span>개인 정보 수집 및 이용 동의</span></label>
+        <button id="su-submit" class="btn-primary" type="button">회원 가입</button>
+        <button class="link-btn" data-go="login" type="button">이미 계정이 있으신가요?</button>
+      </div>
+    </section>
+
+    <!-- ====== SCREEN: 로그인 ====== -->
+    <section class="screen" data-screen="login">
+      <div class="card-wrap">
+        <div class="brand-small"><img class="brand-icon" src="icons/solemate-logo.svg" alt=""/><span class="brand-sole">Sole</span><span class="brand-mate">mate</span></div>
+        <h1 class="screen-title">로그인</h1>
+        <label class="field"><span class="field-label">아이디</span><input id="li-id" type="text" class="text-input" autocomplete="username" /></label>
+        <label class="field"><span class="field-label">비밀번호</span><input id="li-pw" type="password" class="text-input" autocomplete="current-password" /></label>
+        <div class="link-row-right"><button class="link-btn" type="button" id="li-forgot">아이디 / 비밀번호 찾기</button></div>
+        <button id="li-submit" class="btn-primary" type="button">로그인</button>
+        <button class="link-btn" data-go="signup" type="button">아직 계정이 없으신가요?</button>
+      </div>
+    </section>
+
+    <!-- ====== SCREEN: 사전 질문 intro ====== -->
+    <section class="screen" data-screen="survey-intro">
+      <div class="start-wrap">
+        <div class="brand-big small-top"><span class="brand-sole">Sole</span><span class="brand-mate">mate</span></div>
+        <p class="tagline">정확한 측정 및<br/>맞춤형 추천을 위해<br/>간단한 사전 질문에 응해주세요!</p>
+        <div class="foot-illustration" aria-hidden="true"><img src="icons/solemate-logo.svg" alt=""/></div>
+        <button class="btn-primary" data-go="survey-1" type="button">시작하기</button>
+        <button class="link-btn" data-go="analysis-intro" type="button">나중에 하기</button>
+      </div>
+    </section>
+
+    <!-- ====== SCREEN: 사전 질문 1 ====== -->
+    <section class="screen" data-screen="survey-1">
+      <div class="card-wrap">
+        <div class="brand-small"><img class="brand-icon" src="icons/solemate-logo.svg" alt=""/><span class="brand-sole">Sole</span><span class="brand-mate">mate</span></div>
+        <div class="qa-block">
+          <div class="qa-q">1. 생년월일과 성별을 알려주세요.</div>
+          <input id="sv-birth" type="text" class="text-input center" placeholder="YYYY / MM / DD" />
+          <select id="sv-gender" class="text-input center">
+            <option value="">남 / 여 / 선택 없음</option>
+            <option value="male">남</option>
+            <option value="female">여</option>
+            <option value="na">선택 없음</option>
+          </select>
+        </div>
+        <div class="qa-block">
+          <div class="qa-q">2. 신장과 체중을 알려주세요.</div>
+          <input id="sv-height" type="number" class="text-input center" placeholder="cm" min="80" max="240" />
+          <input id="sv-weight" type="number" class="text-input center" placeholder="kg" min="20" max="200" />
+        </div>
+        <div class="qa-block">
+          <div class="qa-q">3. 평소에 신는 신발 사이즈를 알려주세요.</div>
+          <input id="sv-shoe" type="number" class="text-input center" placeholder="mm" min="150" max="350" step="5" />
+        </div>
+        <button class="btn-primary" data-go="survey-2" type="button">다음</button>
+        <button class="link-btn small-link" type="button">ⓘ 수집 목적 및 개인정보 보호</button>
+      </div>
+    </section>
+
+    <!-- ====== SCREEN: 사전 질문 2 ====== -->
+    <section class="screen" data-screen="survey-2">
+      <div class="card-wrap">
+        <div class="brand-small"><img class="brand-icon" src="icons/solemate-logo.svg" alt=""/><span class="brand-sole">Sole</span><span class="brand-mate">mate</span></div>
+        <div class="qa-block">
+          <div class="qa-q">4. 평소 선호하는 신발의 착용감을<br/>알려주세요.</div>
+          <div class="slider-card">
+            <div class="slider-row">
+              <div class="slider-name">쿠션감</div>
+              <input id="sv-cushion" type="range" min="0" max="100" value="50" />
+              <div class="slider-labels"><span>단단함</span><span>폭신함</span></div>
+            </div>
+            <div class="slider-row">
+              <div class="slider-name">발볼 여유</div>
+              <input id="sv-ballroom" type="range" min="0" max="100" value="50" />
+              <div class="slider-labels"><span>타이트함</span><span>널널함</span></div>
+            </div>
+            <div class="slider-row">
+              <div class="slider-name">신발 무게</div>
+              <input id="sv-weightpref" type="range" min="0" max="100" value="50" />
+              <div class="slider-labels"><span>무거움</span><span>가벼움</span></div>
+            </div>
+          </div>
+        </div>
+        <button class="btn-primary" data-go="survey-3" type="button">다음</button>
+        <button class="link-btn small-link" type="button">ⓘ 수집 목적 및 개인정보 보호</button>
+      </div>
+    </section>
+
+    <!-- ====== SCREEN: 사전 질문 3 ====== -->
+    <section class="screen" data-screen="survey-3">
+      <div class="card-wrap">
+        <div class="brand-small"><img class="brand-icon" src="icons/solemate-logo.svg" alt=""/><span class="brand-sole">Sole</span><span class="brand-mate">mate</span></div>
+        <div class="qa-block">
+          <div class="qa-q">5. 발에 불편함이나 통증이 있나요?</div>
+          <div class="checklist">
+            <label class="check-line"><span>평발</span><input type="checkbox" value="flat" class="sv-issue"/></label>
+            <label class="check-line"><span>무지외반증</span><input type="checkbox" value="bunion" class="sv-issue"/></label>
+            <label class="check-line"><span>발바닥 통증</span><input type="checkbox" value="sole_pain" class="sv-issue"/></label>
+            <label class="check-line"><span>아킬레스건 통증</span><input type="checkbox" value="achilles" class="sv-issue"/></label>
+            <label class="check-line"><span>기타</span><input type="checkbox" value="other" class="sv-issue"/></label>
+            <label class="check-line"><span>없음</span><input type="checkbox" value="none" class="sv-issue"/></label>
+          </div>
+        </div>
+        <div class="qa-block">
+          <div class="qa-q">6. 발에 민감한 소재가 있나요?</div>
+          <select id="sv-sensitive" class="text-input center">
+            <option value="">예 / 아니오</option>
+            <option value="yes">예</option>
+            <option value="no">아니오</option>
+          </select>
+          <div class="sub-label">민감한 소재 <span>(선택)</span></div>
+          <input id="sv-sensitive-note" type="text" class="text-input center" placeholder="예) 가죽, 고무 등" />
+        </div>
+        <button id="sv-done" class="btn-primary" type="button">완료</button>
+        <button class="link-btn small-link" type="button">ⓘ 수집 목적 및 개인정보 보호</button>
+      </div>
+    </section>
+
+    <!-- ====== SCREEN: 발 분석 시작하기 ====== -->
+    <section class="screen" data-screen="analysis-intro">
+      <div class="start-wrap">
+        <div class="brand-big small-top"><span class="brand-sole">Sole</span><span class="brand-mate">mate</span></div>
+        <p class="tagline">내 발에 딱 맞는<br/>신발을 찾아드려요</p>
+        <div class="foot-illustration" aria-hidden="true"><img src="icons/solemate-logo.svg" alt=""/></div>
+        <button class="btn-primary" data-go="capture-front" type="button">발 분석 시작하기</button>
+        <button class="link-btn" id="go-mypage" type="button">내 정보 / 측정 기록</button>
+      </div>
+    </section>
+
+    <!-- ====== SCREEN: 정면 촬영 ====== -->
+    <section class="screen" data-screen="capture-front">
+      <div class="card-wrap">
+        <div class="brand-small"><img class="brand-icon" src="icons/solemate-logo.svg" alt=""/><span class="brand-sole">Sole</span><span class="brand-mate">mate</span></div>
+        <h2 class="screen-title">발 정면 촬영</h2>
+        <div class="viewfinder" id="vf-front">
+          <video class="vf-video" id="vf-front-video" playsinline muted autoplay></video>
+          <img class="vf-preview" id="vf-front-img" alt="" />
+          <canvas class="vf-canvas" id="vf-front-canvas"></canvas>
+          <div class="vf-overlay">
+            <div class="vf-message">맨발로 평평한 바닥에 서서<br/>발을 가이드 라인에 맞춰주세요</div>
+            <svg class="vf-guide" viewBox="0 0 120 200" fill="none" stroke="#9caf60" stroke-width="2" stroke-dasharray="6 4" aria-hidden="true">
+              <ellipse cx="60" cy="170" rx="28" ry="22"/>
+              <path d="M40 168 C 35 110, 30 60, 55 25 C 65 12, 80 12, 88 30 C 95 55, 92 110, 82 168" />
+            </svg>
+          </div>
+        </div>
+        <ul class="checklist-tip">
+          <li>바닥이 평평한가요?</li>
+          <li>카메라가 수평인가요?</li>
+          <li>발이 가이드 라인에 들어 왔나요?</li>
+          <li><strong>A4 위에 발을 올렸나요?</strong> (정확도 ↑)</li>
+        </ul>
+        <input id="cap-front-input" type="file" accept="image/*" capture="environment" hidden />
+        <div class="capture-btn-row">
+          <button class="btn-circle" id="cap-front-btn" type="button" aria-label="촬영">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none"><circle cx="12" cy="12" r="6" fill="white"/></svg>
+          </button>
+        </div>
+        <button class="link-btn" data-go="analysis-intro" type="button">취소</button>
+      </div>
+    </section>
+
+    <!-- ====== SCREEN: 측면 촬영 ====== -->
+    <section class="screen" data-screen="capture-side">
+      <div class="card-wrap">
+        <div class="brand-small"><img class="brand-icon" src="icons/solemate-logo.svg" alt=""/><span class="brand-sole">Sole</span><span class="brand-mate">mate</span></div>
+        <h2 class="screen-title">발 측면 촬영</h2>
+        <div class="viewfinder" id="vf-side">
+          <video class="vf-video" id="vf-side-video" playsinline muted autoplay></video>
+          <img class="vf-preview" id="vf-side-img" alt="" />
+          <canvas class="vf-canvas" id="vf-side-canvas"></canvas>
+          <div class="vf-overlay">
+            <div class="vf-message">맨발로 평평한 바닥에 서서<br/>발을 가이드 라인에 맞춰주세요</div>
+            <svg class="vf-guide" viewBox="0 0 200 120" fill="none" stroke="#9caf60" stroke-width="2" stroke-dasharray="6 4" aria-hidden="true">
+              <path d="M10 90 C 30 70, 60 65, 90 70 C 130 75, 165 60, 185 30 C 190 25, 192 40, 188 60 C 185 78, 165 90, 130 95 C 70 100, 30 100, 10 95 Z" />
+            </svg>
+          </div>
+        </div>
+        <ul class="checklist-tip">
+          <li>바닥이 평평한가요?</li>
+          <li>카메라가 수평인가요?</li>
+          <li>발이 가이드 라인에 들어 왔나요?</li>
+        </ul>
+        <input id="cap-side-input" type="file" accept="image/*" capture="environment" hidden />
+        <div class="capture-btn-row">
+          <button class="btn-circle" id="cap-side-btn" type="button" aria-label="촬영">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none"><circle cx="12" cy="12" r="6" fill="white"/></svg>
+          </button>
+        </div>
+        <button class="link-btn" data-go="capture-front" type="button">이전</button>
+      </div>
+    </section>
+
+    <!-- ====== SCREEN: 분석 진행중 ====== -->
+    <section class="screen" data-screen="analyzing">
+      <div class="card-wrap center-content">
+        <div class="brand-small"><span class="brand-sole">Sole</span><span class="brand-mate">mate</span></div>
+        <div class="spinner"></div>
+        <div class="analyze-title">AI가 발을 분석하고 있어요</div>
+        <div class="analyze-sub" id="analyze-sub">잠시만 기다려주세요…</div>
+        <div class="loading-bar"><div class="loading-fill" id="loading-fill"></div></div>
+      </div>
+    </section>
+
+    <!-- ====== SCREEN: 분석 결과 ====== -->
+    <section class="screen" data-screen="result">
+      <div class="card-wrap">
+        <div class="brand-small"><img class="brand-icon" src="icons/solemate-logo.svg" alt=""/><span class="brand-sole">Sole</span><span class="brand-mate">mate</span></div>
+        <h2 class="screen-title">분석 결과</h2>
+
+        <div class="result-image-box">
+          <canvas id="result-canvas"></canvas>
+          <div class="result-type-card" id="result-type-card">
+            <div class="result-type-copy">
+              <div class="result-type-kicker">당신의 발 유형은</div>
+              <div class="result-type-name" id="r-width-type">—</div>
+              <div class="result-type-desc" id="r-width-desc">측정 결과를 분석하고 있어요.</div>
+            </div>
+            <svg class="result-foot-icon" viewBox="0 0 90 130" fill="none" aria-hidden="true">
+              <ellipse cx="42" cy="74" rx="21" ry="43" fill="rgba(255,255,255,0.72)"/>
+              <circle cx="25" cy="23" r="8" fill="rgba(255,255,255,0.72)"/>
+              <circle cx="40" cy="17" r="7" fill="rgba(255,255,255,0.72)"/>
+              <circle cx="54" cy="20" r="6" fill="rgba(255,255,255,0.72)"/>
+              <circle cx="66" cy="27" r="5" fill="rgba(255,255,255,0.72)"/>
+              <circle cx="75" cy="36" r="4" fill="rgba(255,255,255,0.72)"/>
+              <path d="M43 36 C 35 56, 35 85, 43 114" stroke="rgba(156,175,96,0.42)" stroke-width="3" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="result-feet-row">
+          <div class="result-foot">
+            <div class="result-foot-title">왼발</div>
+            <div class="result-foot-line">길이 : <span id="r-left-len">—</span>mm</div>
+            <div class="result-foot-line">발볼 넓이 : <span id="r-left-w">—</span>mm</div>
+          </div>
+          <div class="result-foot-divider"></div>
+          <div class="result-foot">
+            <div class="result-foot-title">오른발</div>
+            <div class="result-foot-line">길이 : <span id="r-right-len">—</span>mm</div>
+            <div class="result-foot-line">발볼 넓이 : <span id="r-right-w">—</span>mm</div>
+          </div>
+        </div>
+
+        <div class="result-meta-row">
+          <div class="meta-label">발 유형 :</div>
+          <div class="meta-value" id="r-foot-type">—</div>
+        </div>
+
+        <div class="result-meta-row tall">
+          <div class="meta-label">추천 사이즈 :</div>
+          <div class="meta-brands">
+            <div><span class="brand-name">나이키</span><span id="r-nike">—</span></div>
+            <div><span class="brand-name">아디다스</span><span id="r-adidas">—</span></div>
+            <div><span class="brand-name">뉴발란스</span><span id="r-newbalance">—</span></div>
+            <div><span class="brand-name">컨버스</span><span id="r-converse">—</span></div>
+          </div>
+        </div>
+
+        <!-- 결과 액션: 다시 측정 / 저장 / 신발 보러가기 (세 버튼이 동일 높이의 같은 행) -->
+        <div class="result-actions">
+          <button class="btn-secondary third" data-go="analysis-intro" type="button">다시 측정</button>
+          <button class="btn-primary third"   id="r-save"  type="button">저장</button>
+          <button class="btn-primary third"   id="r-shop"  type="button">신발 보러가기</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== SCREEN: 내 페이지 ====== -->
+    <!-- ====== SCREEN: 추천 신발 ====== -->
+    <section class="screen" data-screen="shoe-recommendations">
+      <div class="card-wrap recommendation-wrap">
+        <div class="recommend-head">
+          <button class="recommend-back" data-go="result" type="button" aria-label="뒤로">‹</button>
+          <h2>추천 신발</h2>
+        </div>
+        <div class="recommend-summary" id="recommend-summary"></div>
+        <div class="recommend-tools">
+          <label class="recommend-search" for="recommend-search">
+            <span>검색</span>
+            <input id="recommend-search" type="search" placeholder="브랜드 또는 모델명" autocomplete="off" />
+          </label>
+          <div class="recommend-brand-chips" id="recommend-brand-chips" aria-label="브랜드 필터"></div>
+        </div>
+        <div class="recommend-tabs" role="tablist" aria-label="신발 카테고리">
+          <button class="recommend-tab active" type="button" data-category="all">전체</button>
+          <button class="recommend-tab" type="button" data-category="running">러닝화</button>
+          <button class="recommend-tab" type="button" data-category="sneakers">스니커즈</button>
+          <button class="recommend-tab" type="button" data-category="training">운동화</button>
+        </div>
+        <div class="recommend-list" id="recommend-list"></div>
+      </div>
+    </section>
+
+    <!-- ====== SCREEN: 신발 정보 ====== -->
+    <section class="screen" data-screen="shoe-detail">
+      <div class="card-wrap shoe-detail-wrap">
+        <div class="detail-brand-row">
+          <img class="brand-icon" src="icons/solemate-logo.svg" alt=""/>
+          <span class="brand-sole">Sole</span><span class="brand-mate">mate</span>
+        </div>
+        <button class="detail-back" data-go="shoe-recommendations" type="button" aria-label="뒤로">&lt;</button>
+
+        <div class="detail-image-card">
+          <div class="detail-shoe-art" id="detail-shoe-art"></div>
+          <button class="detail-heart" type="button" aria-label="찜하기">♡</button>
+        </div>
+
+        <div class="detail-main-info">
+          <h2 id="detail-product-name">상품명</h2>
+          <div id="detail-product-price">가격</div>
+        </div>
+
+        <div class="detail-brand-card">
+          <span class="detail-logo">로고</span>
+          <strong id="detail-brand-name">브랜드명</strong>
+          <button id="detail-brand-more" type="button">이 브랜드 신발 더보기 &gt;</button>
+        </div>
+
+        <section class="detail-section">
+          <h3>추천 사이즈</h3>
+          <p id="detail-size-name">000</p>
+          <p id="detail-size-mm">000mm x 000mm</p>
+        </section>
+
+        <section class="detail-section">
+          <h3>신발 특징</h3>
+          <p id="detail-feature">-</p>
+        </section>
+
+        <section class="detail-section">
+          <h3>추천 이유</h3>
+          <p id="detail-reason">-</p>
+          <button class="btn-primary detail-next" data-go="clothes-recommendations" type="button">옷 추천 보러가기</button>
+        </section>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="clothes-recommendations">
+      <div class="card-wrap clothes-wrap">
+        <div class="recommend-head">
+          <button class="recommend-back" data-go="shoe-detail" type="button" aria-label="뒤로">&lt;</button>
+          <h2>옷 추천</h2>
+        </div>
+        <div class="clothes-hero">
+          <div>
+            <div class="clothes-kicker">Solemate styling</div>
+            <h3>추천 신발에 맞는 착장</h3>
+            <p>신발의 색감과 실루엣에 맞춰 바로 입기 좋은 조합을 골랐어요.</p>
+          </div>
+        </div>
+        <div class="clothes-list" id="clothes-list">
+          <article class="clothes-card">
+            <div class="clothes-swatch dark"></div>
+            <div>
+              <h4>러닝 캐주얼</h4>
+              <p>테크 팬츠, 라이트 윈드브레이커, 무지 티셔츠</p>
+            </div>
+          </article>
+          <article class="clothes-card">
+            <div class="clothes-swatch soft"></div>
+            <div>
+              <h4>데일리 미니멀</h4>
+              <p>스트레이트 데님, 크림 니트, 숏 재킷</p>
+            </div>
+          </article>
+          <article class="clothes-card">
+            <div class="clothes-swatch green"></div>
+            <div>
+              <h4>편안한 워킹룩</h4>
+              <p>조거 팬츠, 코튼 후디, 얇은 베스트</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="outfit-detail">
+      <div class="card-wrap outfit-detail-wrap">
+        <div class="recommend-head">
+          <button class="recommend-back" data-go="clothes-recommendations" type="button" aria-label="뒤로">&lt;</button>
+          <h2>풀 착장</h2>
+        </div>
+        <div class="outfit-visual" id="outfit-visual"></div>
+        <div class="outfit-title-row">
+          <h3 id="outfit-title">착장명</h3>
+          <p id="outfit-desc">추천 착장 설명</p>
+        </div>
+        <div class="outfit-items" id="outfit-items"></div>
+        <div class="outfit-reason">
+          <h4>추천 포인트</h4>
+          <p id="outfit-reason">-</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="mypage">
+      <div class="card-wrap">
+        <div class="brand-small"><img class="brand-icon" src="icons/solemate-logo.svg" alt=""/><span class="brand-sole">Sole</span><span class="brand-mate">mate</span></div>
+        <h2 class="screen-title">내 정보</h2>
+        <div id="mp-content"></div>
+        <div class="result-actions two">
+          <button class="btn-secondary half" data-go="analysis-intro" type="button">분석으로</button>
+          <button class="btn-primary half" id="mp-logout" type="button">로그아웃</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== SCREEN: 관리자 ====== -->
+    <section class="screen" data-screen="admin">
+      <div class="card-wrap wide">
+        <div class="brand-small"><img class="brand-icon" src="icons/solemate-logo.svg" alt=""/><span class="brand-sole">Sole</span><span class="brand-mate">mate</span><span class="admin-badge">관리자</span></div>
+        <h2 class="screen-title">사용자 관리</h2>
+        <div id="admin-content"></div>
+        <button class="btn-primary" id="admin-logout" type="button">로그아웃</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

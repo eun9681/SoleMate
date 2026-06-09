@@ -1,0 +1,20 @@
+{
+  "name": "Solemate · 내 발에 딱 맞는 신발",
+  "short_name": "Solemate",
+  "description": "A4 용지 기준으로 발 사이즈를 자동 측정하고, 나이키·아디다스·뉴발란스·컨버스 사이즈를 추천해주는 PWA.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fdf4e3",
+  "theme_color": "#9caf60",
+  "lang": "ko",
+  "categories": ["health", "lifestyle", "shopping"],
+  "icons": [
+    { "src": "icons/app-icon.svg", "sizes": "250x250", "type": "image/svg+xml", "purpose": "any maskable" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
