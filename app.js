@@ -33,16 +33,26 @@ const WIDTH_TYPE_INFO = {
 const BRAND_OFFSETS = { nike: 5, adidas: 5, newbalance: 10, converse: 5 };
 
 const STORE = {
-  loadUsers() { try { return JSON.parse(localStorage.getItem("solemate.users") || "[]"); } catch { return []; } },
-  saveUsers(u) { localStorage.setItem("solemate.users", JSON.stringify(u)); },
+  usersCache: [],
+  currentUserCache: null,
+  loadUsers() { return STORE.usersCache; },
+  saveUsers(u) { STORE.usersCache = u; },
   loadSession() { try { return JSON.parse(localStorage.getItem("solemate.session") || "null"); } catch { return null; } },
   saveSession(s) { s ? localStorage.setItem("solemate.session", JSON.stringify(s)) : localStorage.removeItem("solemate.session"); },
-  currentUser() { const s = STORE.loadSession(); if (!s || s.isAdmin) return null; return STORE.loadUsers().find(u => u.id === s.userId) || null; },
-  updateCurrentUser(patch) {
-    const s = STORE.loadSession(); if (!s || s.isAdmin) return;
-    const users = STORE.loadUsers();
-    const i = users.findIndex(u => u.id === s.userId);
-    if (i >= 0) { users[i] = { ...users[i], ...patch }; STORE.saveUsers(users); }
+  currentUser() { return STORE.currentUserCache; },
+  setCurrentUser(u) { STORE.currentUserCache = u; },
+  async updateCurrentUser(patch) {
+    const u = STORE.currentUser();
+    if (!u || !u.uid) return;
+    const next = { ...u, ...patch };
+    STORE.currentUserCache = next;
+    try {
+      const fb = await getFirebase();
+      await fb.updateDoc(fb.doc(fb.db, "users", u.uid), patch);
+    } catch (error) {
+      console.error(error);
+      toast("Firebase 저장에 실패했어요. 네트워크를 확인해 주세요.");
+    }
   },
 };
 
@@ -95,19 +105,78 @@ function routeAfterLogin(u) {
 }
 
 // ===== Auth =====
-function tryLogin(id, pw) {
+async function getFirebase() {
+  for (let i = 0; i < 60; i++) {
+    if (window.SolemateFirebaseReady) return window.SolemateFirebaseReady;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error("Firebase가 아직 초기화되지 않았어요.");
+}
+
+function normalizeFirebaseUser(firebaseUser, data = {}) {
+  return {
+    uid: firebaseUser.uid,
+    id: data.id || firebaseUser.displayName || firebaseUser.email?.split("@")[0] || firebaseUser.uid,
+    email: data.email || firebaseUser.email || "",
+    createdAt: data.createdAt || firebaseUser.metadata?.creationTime || new Date().toISOString(),
+    survey: data.survey || null,
+    results: data.results || [],
+    likedShoes: data.likedShoes || [],
+  };
+}
+
+async function loadFirebaseUser(firebaseUser) {
+  const fb = await getFirebase();
+  const snap = await fb.getDoc(fb.doc(fb.db, "users", firebaseUser.uid));
+  const user = normalizeFirebaseUser(firebaseUser, snap.exists() ? snap.data() : {});
+  if (!snap.exists()) {
+    await fb.setDoc(fb.doc(fb.db, "users", firebaseUser.uid), user, { merge: true });
+  }
+  STORE.setCurrentUser(user);
+  return user;
+}
+
+function firebaseAuthMessage(error) {
+  const code = error?.code || "";
+  if (code.includes("email-already-in-use")) return "이미 가입된 이메일이에요";
+  if (code.includes("invalid-email")) return "이메일 형식을 확인해 주세요";
+  if (code.includes("weak-password")) return "비밀번호는 6자 이상이어야 해요";
+  if (code.includes("user-not-found") || code.includes("wrong-password") || code.includes("invalid-credential")) {
+    return "아이디/이메일 또는 비밀번호가 맞지 않아요";
+  }
+  if (code.includes("network-request-failed")) return "네트워크 연결을 확인해 주세요";
+  return "Firebase 인증 중 문제가 생겼어요";
+}
+
+async function resolveLoginEmail(idOrEmail) {
+  if (idOrEmail.includes("@")) return idOrEmail;
+  const fb = await getFirebase();
+  const snap = await fb.getDoc(fb.doc(fb.db, "usernames", idOrEmail));
+  return snap.exists() ? snap.data().email : "";
+}
+
+async function tryLogin(id, pw) {
   if (!id || !pw) { toast("아이디와 비밀번호를 입력해 주세요"); return false; }
   if (id === ADMIN_ID && pw === ADMIN_PW) {
     STORE.saveSession({ userId: "admin", isAdmin: true });
     showScreen("admin"); renderAdmin(); return true;
   }
-  const u = STORE.loadUsers().find(x => x.id === id && x.password === pw);
-  if (!u) { toast("아이디 또는 비밀번호가 맞지 않아요"); return false; }
-  STORE.saveSession({ userId: u.id, isAdmin: false });
-  routeAfterLogin(u);
-  return true;
+  try {
+    const fb = await getFirebase();
+    const email = await resolveLoginEmail(id);
+    if (!email) { toast("아이디 또는 이메일을 찾을 수 없어요"); return false; }
+    const credential = await fb.signInWithEmailAndPassword(fb.auth, email, pw);
+    const u = await loadFirebaseUser(credential.user);
+    STORE.saveSession(null);
+    routeAfterLogin(u);
+    return true;
+  } catch (error) {
+    console.error(error);
+    toast(firebaseAuthMessage(error));
+    return false;
+  }
 }
-function trySignup() {
+async function trySignup() {
   const id = $("su-id").value.trim();
   const pw = $("su-pw").value, pw2 = $("su-pw2").value;
   const email = $("su-email").value.trim();
@@ -116,26 +185,60 @@ function trySignup() {
   if (!id) return toast("아이디를 입력해 주세요");
   if (id.length < 3) return toast("아이디는 3자 이상이어야 해요");
   if (!pw) return toast("비밀번호를 입력해 주세요");
-  if (pw.length < 4) return toast("비밀번호는 4자 이상이어야 해요");
+  if (pw.length < 6) return toast("Firebase 비밀번호는 6자 이상이어야 해요");
   if (pw !== pw2) return toast("비밀번호 확인이 일치하지 않아요");
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return toast("이메일 형식을 확인해 주세요");
   if (!consent) return toast("개인정보 수집 동의가 필요해요");
   if (state.pendingCode && code && code !== state.pendingCode) return toast("인증 코드가 맞지 않아요");
-  const users = STORE.loadUsers();
-  if (users.find(u => u.id === id)) return toast("이미 존재하는 아이디예요");
-  users.push({ id, password: pw, email, createdAt: new Date().toISOString(), survey: null, results: [] });
-  STORE.saveUsers(users);
-  STORE.saveSession({ userId: id, isAdmin: false });
-  toast("가입 완료!"); setTimeout(() => showScreen("survey-intro"), 600);
+  try {
+    const fb = await getFirebase();
+    const usernameRef = fb.doc(fb.db, "usernames", id);
+    const usernameSnap = await fb.getDoc(usernameRef);
+    if (usernameSnap.exists() || id === ADMIN_ID) return toast("이미 존재하는 아이디예요");
+    const credential = await fb.createUserWithEmailAndPassword(fb.auth, email, pw);
+    await fb.updateProfile(credential.user, { displayName: id });
+    const user = {
+      uid: credential.user.uid,
+      id,
+      email,
+      createdAt: new Date().toISOString(),
+      survey: null,
+      results: [],
+      likedShoes: [],
+    };
+    await fb.setDoc(fb.doc(fb.db, "users", credential.user.uid), {
+      ...user,
+      createdAtServer: fb.serverTimestamp(),
+    });
+    await fb.setDoc(usernameRef, {
+      uid: credential.user.uid,
+      email,
+      createdAt: fb.serverTimestamp(),
+    });
+    STORE.setCurrentUser(user);
+    STORE.saveSession(null);
+    toast("가입 완료!");
+    setTimeout(() => showScreen("survey-intro"), 600);
+  } catch (error) {
+    console.error(error);
+    toast(firebaseAuthMessage(error));
+  }
 }
-function checkIdDuplicate() {
+async function checkIdDuplicate() {
   const id = $("su-id").value.trim();
   const msg = $("su-id-msg");
   if (!id) { msg.textContent = "아이디를 입력해 주세요"; msg.className = "field-msg err"; return; }
-  if (id === ADMIN_ID || STORE.loadUsers().find(u => u.id === id)) {
-    msg.textContent = "이미 사용 중인 아이디예요"; msg.className = "field-msg err";
-  } else {
-    msg.textContent = "사용 가능한 아이디예요"; msg.className = "field-msg ok";
+  try {
+    const fb = await getFirebase();
+    const snap = await fb.getDoc(fb.doc(fb.db, "usernames", id));
+    if (id === ADMIN_ID || snap.exists()) {
+      msg.textContent = "이미 사용 중인 아이디예요"; msg.className = "field-msg err";
+    } else {
+      msg.textContent = "사용 가능한 아이디예요"; msg.className = "field-msg ok";
+    }
+  } catch (error) {
+    console.error(error);
+    msg.textContent = "중복 확인에 실패했어요"; msg.className = "field-msg err";
   }
 }
 function sendVerifyCode() {
@@ -147,7 +250,21 @@ function sendVerifyCode() {
   $("su-code-msg").className = "field-msg ok";
   toast("인증 코드를 발송했어요 (데모)");
 }
-function logout() { STORE.saveSession(null); toast("로그아웃 되었어요"); showScreen("start"); }
+async function logout() {
+  const session = STORE.loadSession();
+  STORE.saveSession(null);
+  STORE.setCurrentUser(null);
+  if (!session?.isAdmin) {
+    try {
+      const fb = await getFirebase();
+      await fb.signOut(fb.auth);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  toast("로그아웃 되었어요");
+  showScreen("start");
+}
 
 // ===== Survey =====
 function getCheckedIssues() { return $$(".sv-issue:checked").map(el => el.value); }
@@ -785,12 +902,25 @@ function renderShoeRecommendations(category = state.recommendCategory || "all") 
 }
 
 function loadLikedShoes() {
-  try { return JSON.parse(localStorage.getItem("solemate.likedShoes") || "[]"); }
-  catch { return []; }
+  return STORE.currentUser()?.likedShoes || [];
 }
 
-function saveLikedShoes(ids) {
-  localStorage.setItem("solemate.likedShoes", JSON.stringify(ids));
+async function saveLikedShoes(ids) {
+  const user = STORE.currentUser();
+  if (!user) {
+    toast("로그인이 필요해요");
+    return false;
+  }
+  STORE.setCurrentUser({ ...user, likedShoes: ids });
+  try {
+    const fb = await getFirebase();
+    await fb.updateDoc(fb.doc(fb.db, "users", user.uid), { likedShoes: ids });
+    return true;
+  } catch (error) {
+    console.error(error);
+    toast("좋아요 저장에 실패했어요. 네트워크를 확인해 주세요.");
+    return false;
+  }
 }
 
 function productLikeId(productIndex) {
@@ -813,13 +943,19 @@ function updateHeartButton(productIndex) {
   btn.setAttribute("aria-label", liked ? "찜 해제" : "찜하기");
 }
 
-function toggleCurrentShoeLike() {
+async function toggleCurrentShoeLike() {
   const productIndex = state.currentProductIndex;
   const id = productLikeId(productIndex);
   if (!id) return;
+  if (!STORE.currentUser()) {
+    toast("로그인이 필요해요");
+    showScreen("login");
+    return;
+  }
   const liked = loadLikedShoes();
   const next = liked.includes(id) ? liked.filter((item) => item !== id) : liked.concat(id);
-  saveLikedShoes(next);
+  const saved = await saveLikedShoes(next);
+  if (!saved) return;
   updateHeartButton(productIndex);
   toast(next.includes(id) ? "좋아요에 추가했어요" : "좋아요를 해제했어요");
 }
@@ -1058,6 +1194,7 @@ function renderMyPage() {
     `<div class="mp-row"><span class="label">평소 신발 사이즈</span><span class="value">${s.usualShoeSizeMm || "—"}mm</span></div>` +
     `<div class="mp-row"><span class="label">발 이슈</span><span class="value">${issues}</span></div>` +
     `<div class="mp-row"><span class="label">측정 횟수</span><span class="value">${(u.results || []).length}회</span></div>` +
+    `<div class="mp-row"><span class="label">좋아요 신발</span><span class="value">${(u.likedShoes || []).length}개</span></div>` +
     (last ?
       `<div class="mp-row"><span class="label">마지막 측정</span><span class="value">${last.date.slice(0, 10)}</span></div>` +
       `<div class="mp-row"><span class="label">최근 발 길이</span><span class="value">${last.leftFoot.lengthMm.toFixed(1)}mm</span></div>` +
@@ -1066,9 +1203,20 @@ function renderMyPage() {
 }
 
 // ===== Admin =====
-function renderAdmin() {
+async function renderAdmin() {
   const box = $("admin-content");
-  const users = STORE.loadUsers();
+  box.innerHTML = "<div class='admin-empty'>Firebase 사용자 목록을 불러오는 중이에요</div>";
+  let users = STORE.loadUsers();
+  try {
+    const fb = await getFirebase();
+    const snap = await fb.getDocs(fb.collection(fb.db, "users"));
+    users = snap.docs.map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() }));
+    STORE.saveUsers(users);
+  } catch (error) {
+    console.error(error);
+    box.innerHTML = "<div class='admin-empty'>Firebase 사용자 목록을 불러오지 못했어요</div>";
+    return;
+  }
   if (users.length === 0) { box.innerHTML = "<div class='admin-empty'>아직 가입한 사용자가 없어요</div>"; return; }
   box.innerHTML = users.map(u => {
     const s = u.survey || {};
@@ -1176,17 +1324,44 @@ function bind() {
   $("admin-logout").addEventListener("click", logout);
 }
 
+async function bootAuth() {
+  const session = STORE.loadSession();
+  if (session?.isAdmin) {
+    showScreen("admin");
+    renderAdmin();
+    return;
+  }
+  try {
+    const fb = await getFirebase();
+    let first = true;
+    fb.onAuthStateChanged(fb.auth, async (firebaseUser) => {
+      try {
+        if (firebaseUser) {
+          const u = await loadFirebaseUser(firebaseUser);
+          routeAfterLogin(u);
+        } else {
+          STORE.setCurrentUser(null);
+          if (first) showScreen("start");
+        }
+      } catch (error) {
+        console.error(error);
+        STORE.setCurrentUser(null);
+        showScreen("start");
+        toast("Firebase 사용자 정보를 불러오지 못했어요.");
+      } finally {
+        first = false;
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    showScreen("start");
+    toast("Firebase 초기화에 실패했어요. 인터넷 연결을 확인해 주세요.");
+  }
+}
+
 // ===== Boot =====
 document.addEventListener("DOMContentLoaded", () => {
   bind();
-  const session = STORE.loadSession();
-  if (session) {
-    if (session.isAdmin) { showScreen("admin"); renderAdmin(); }
-    else {
-      const u = STORE.currentUser();
-      if (!u) STORE.saveSession(null);
-      else routeAfterLogin(u);
-    }
-  }
+  bootAuth();
   loadOpenCV().catch(() => {});
 });
