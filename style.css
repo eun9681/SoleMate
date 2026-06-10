@@ -18,7 +18,7 @@
 
 :root {
   --app-width: 460px;
-  --app-height: 800px;
+  --app-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   --bg: #fdf4e3;
   --bg-2: #f9ecd4;
   --card: #ffffff;
@@ -53,13 +53,13 @@ body {
   background: linear-gradient(180deg, #fdf4e3 0%, #f9ecd4 100%);
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
-  overflow-x: hidden;
+  overflow: hidden;
 }
 button { font-family: inherit; cursor: pointer; }
 input, select { font-family: inherit; }
 
 .page {
-  width: var(--app-width);
+  width: min(var(--app-width), 100vw);
   height: var(--app-height);
   max-width: 100vw;
   margin: 0 auto;
