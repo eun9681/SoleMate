@@ -75,6 +75,8 @@ const $ = (id) => document.getElementById(id);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
 function showScreen(name) {
+  const current = document.querySelector(".screen.active")?.dataset.screen;
+  if (name === "capture-front" && current !== "capture-side") resetCaptureSession();
   $$(".screen").forEach(s => s.classList.remove("active"));
   const t = document.querySelector(`.screen[data-screen="${name}"]`);
   if (t) t.classList.add("active");
@@ -642,6 +644,27 @@ function stopLiveCamera() {
   }
   state.camera.stream = null;
   state.camera.side = null;
+}
+
+function resetCaptureSession() {
+  stopLiveCamera();
+  state.frontFile = null;
+  state.frontDataUrl = null;
+  state.sideFile = null;
+  state.sideDataUrl = null;
+  ["front", "side"].forEach((side) => {
+    const vf = $(`vf-${side}`);
+    const img = $(`vf-${side}-img`);
+    const input = $(`cap-${side}-input`);
+    const canvas = $(`vf-${side}-canvas`);
+    if (vf) vf.classList.remove("has-photo", "camera-live");
+    if (img) img.removeAttribute("src");
+    if (input) input.value = "";
+    if (canvas) {
+      const ctx = canvas.getContext("2d");
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  });
 }
 
 function handleCameraScreen(name) {
