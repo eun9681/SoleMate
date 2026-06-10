@@ -7,6 +7,7 @@ const BALL_GIRTH_FACTOR = 2.5;
 const A4_ASPECT = A4_W_MM / A4_H_MM;
 const ADMIN_ID = "admin", ADMIN_PW = "admin1234";
 const LENGTH_BIAS_MM = -20;
+const SURVEY_SIZE_TOLERANCE_MM = 5;
 const FOOT_TYPE_LABEL = { flat: "평발", normal: "정상 아치", high: "요족" };
 const WIDTH_TYPE_INFO = {
   narrow: {
@@ -594,10 +595,11 @@ function calibrateLength(rawMm) {
   const measuredMm = rawMm + LENGTH_BIAS_MM;
   const u = STORE.currentUser();
   if (!u || !u.survey || !u.survey.usualShoeSizeMm) return Math.round(measuredMm * 10) / 10;
-  const expected = u.survey.usualShoeSizeMm - 5;
-  const delta = Math.abs(measuredMm - expected);
-  if (delta <= 15) return Math.round(measuredMm * 10) / 10;
-  return Math.round((measuredMm * 0.6 + expected * 0.4) * 10) / 10;
+  const expected = u.survey.usualShoeSizeMm;
+  const minMm = expected - SURVEY_SIZE_TOLERANCE_MM;
+  const maxMm = expected + SURVEY_SIZE_TOLERANCE_MM;
+  const calibratedMm = Math.min(maxMm, Math.max(minMm, measuredMm));
+  return Math.round(calibratedMm * 10) / 10;
 }
 function recommendBrands(footLenMm) {
   const r5 = (n) => Math.round(n / 5) * 5;
