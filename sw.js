@@ -1,10 +1,11 @@
 /* Solemate Service Worker — offline-first caching for the app shell. */
-const CACHE = "solemate-v3";
+const CACHE = "solemate-v8";
 const ASSETS = [
   "./",
   "./index.html",
   "./style.css",
   "./app.js",
+  "./firebase.js",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
@@ -24,7 +25,7 @@ self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
-  if (url.host === "docs.opencv.org" || url.host === "cdn.jsdelivr.net") {
+  if (url.host === "docs.opencv.org" || url.host === "cdn.jsdelivr.net" || url.host === "www.gstatic.com" || url.host === "thug-club.com") {
     e.respondWith(caches.open(CACHE).then(async (cache) => {
       const cached = await cache.match(req);
       if (cached) return cached;

@@ -366,7 +366,7 @@
         </div>
 
         <div class="detail-brand-card">
-          <span class="detail-logo">로고</span>
+          <span class="detail-logo" id="detail-logo">로고</span>
           <strong id="detail-brand-name">브랜드명</strong>
           <button id="detail-brand-more" type="button">이 브랜드 신발 더보기 &gt;</button>
         </div>
@@ -379,12 +379,12 @@
 
         <section class="detail-section">
           <h3>신발 특징</h3>
-          <p id="detail-feature">-</p>
+          <div id="detail-feature">-</div>
         </section>
 
         <section class="detail-section">
           <h3>추천 이유</h3>
-          <p id="detail-reason">-</p>
+          <div id="detail-reason">-</div>
           <button class="btn-primary detail-next" data-go="clothes-recommendations" type="button">옷 추천 보러가기</button>
         </section>
       </div>
@@ -392,39 +392,48 @@
 
     <section class="screen" data-screen="clothes-recommendations">
       <div class="card-wrap clothes-wrap">
-        <div class="recommend-head">
-          <button class="recommend-back" data-go="shoe-detail" type="button" aria-label="뒤로">&lt;</button>
-          <h2>옷 추천</h2>
+        <div class="shop-topbar">
+          <button class="shop-icon-btn" data-go="shoe-detail" type="button" aria-label="뒤로">‹</button>
+          <div class="shop-wordmark">Sole<span>mate</span></div>
+          <button class="shop-icon-btn" id="shop-search-toggle" type="button" aria-label="검색">⌕</button>
+          <button class="shop-bag-btn" type="button" aria-label="장바구니">0</button>
         </div>
-        <div class="clothes-hero">
-          <div>
-            <div class="clothes-kicker">Solemate styling</div>
-            <h3>추천 신발에 맞는 착장</h3>
-            <p>신발의 색감과 실루엣에 맞춰 바로 입기 좋은 조합을 골랐어요.</p>
-          </div>
+
+        <nav class="shop-nav" aria-label="스타일 메뉴">
+          <button class="active" type="button" data-clothes-menu="new">NEW</button>
+          <button type="button" data-clothes-menu="designer">DESIGNER</button>
+          <button type="button" data-clothes-menu="best">BEST</button>
+          <button type="button" data-clothes-menu="sale">SALE</button>
+          <button type="button" data-clothes-menu="showindow">SHOWINDOW</button>
+        </nav>
+
+        <label class="shop-search-panel" id="shop-search-panel" hidden>
+          <span>검색</span>
+          <input id="clothes-search" type="search" placeholder="상품명 검색" autocomplete="off" />
+        </label>
+
+        <h2 class="shop-ranking-title">RANKING</h2>
+
+        <div class="shop-segment" role="tablist" aria-label="랭킹 종류">
+          <button class="active" type="button" data-clothes-mode="product">PRODUCT</button>
+          <button type="button" data-clothes-mode="brand">BRAND</button>
         </div>
+
+        <div class="shop-category-tabs" aria-label="상품 카테고리">
+          <button class="active" type="button" data-clothes-category="all">ALL</button>
+          <button type="button" data-clothes-category="apparel">APPAREL</button>
+          <button type="button" data-clothes-category="bag">BAG</button>
+          <button type="button" data-clothes-category="acc">ACC</button>
+        </div>
+
         <div class="clothes-list" id="clothes-list">
-          <article class="clothes-card">
-            <div class="clothes-swatch dark"></div>
-            <div>
-              <h4>러닝 캐주얼</h4>
-              <p>테크 팬츠, 라이트 윈드브레이커, 무지 티셔츠</p>
-            </div>
-          </article>
-          <article class="clothes-card">
-            <div class="clothes-swatch soft"></div>
-            <div>
-              <h4>데일리 미니멀</h4>
-              <p>스트레이트 데님, 크림 니트, 숏 재킷</p>
-            </div>
-          </article>
-          <article class="clothes-card">
-            <div class="clothes-swatch green"></div>
-            <div>
-              <h4>편안한 워킹룩</h4>
-              <p>조거 팬츠, 코튼 후디, 얇은 베스트</p>
-            </div>
-          </article>
+        </div>
+
+        <div class="shop-bottom-nav">
+          <button type="button" data-clothes-menu="new">⌂</button>
+          <button type="button" data-clothes-menu="best">↺</button>
+          <button type="button" data-clothes-menu="sale">♡</button>
+          <button type="button" data-clothes-mode="brand">♙</button>
         </div>
       </div>
     </section>
@@ -473,7 +482,10 @@
 
   <div id="toast" class="toast" hidden></div>
 
-  <script type="module" src="firebase.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script src="firebase.js"></script>
   <script src="app.js" defer></script>
 </body>
 </html>

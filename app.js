@@ -4,10 +4,12 @@ const A4_W_MM = 210, A4_H_MM = 297;
 const RECT_W = 990, RECT_H = 1400;
 const PX_PER_MM = RECT_H / A4_H_MM;
 const BALL_GIRTH_FACTOR = 2.5;
+const BALL_WIDTH_TABLE_FACTOR = 1.25;
 const A4_ASPECT = A4_W_MM / A4_H_MM;
 const ADMIN_ID = "admin", ADMIN_PW = "admin1234";
 const LENGTH_BIAS_MM = -20;
 const SURVEY_SIZE_TOLERANCE_MM = 5;
+const FIREBASE_READY_TIMEOUT_MS = 30000;
 const FOOT_TYPE_LABEL = { flat: "평발", normal: "정상 아치", high: "요족" };
 const WIDTH_TYPE_INFO = {
   narrow: {
@@ -32,6 +34,19 @@ const WIDTH_TYPE_INFO = {
   },
 };
 const BRAND_OFFSETS = { nike: 5, adidas: 5, newbalance: 10, converse: 5 };
+const BRAND_SIZE_OFFSETS = {
+  "NEW BALANCE": 10,
+  ASICS: 5,
+  HOKA: 5,
+  SKECHERS: 5,
+  MIZUNO: 5,
+  BROOKS: 5,
+  PUMA: 5,
+  NIKE: 5,
+  CONVERSE: 5,
+  VANS: 5,
+  ADIDAS: 5,
+};
 
 const STORE = {
   usersCache: [],
@@ -69,6 +84,10 @@ const state = {
   recommendCategory: "all",
   recommendBrand: "",
   recommendSearch: "",
+  clothesMenu: "new",
+  clothesMode: "product",
+  clothesCategory: "all",
+  clothesSearch: "",
   camera: { stream: null, side: null },
 };
 const $ = (id) => document.getElementById(id);
@@ -109,11 +128,12 @@ function routeAfterLogin(u) {
 
 // ===== Auth =====
 async function getFirebase() {
-  for (let i = 0; i < 60; i++) {
-    if (window.SolemateFirebaseReady) return window.SolemateFirebaseReady;
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < FIREBASE_READY_TIMEOUT_MS) {
+    if (window.SolemateFirebaseReady) return await window.SolemateFirebaseReady;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw new Error("Firebase가 아직 초기화되지 않았어요.");
+  throw new Error("Firebase 초기화 시간 초과: 네트워크가 느리거나 Firebase 스크립트를 불러오지 못했어요.");
 }
 
 function normalizeFirebaseUser(firebaseUser, data = {}) {
@@ -141,14 +161,22 @@ async function loadFirebaseUser(firebaseUser) {
 
 function firebaseAuthMessage(error) {
   const code = error?.code || "";
+  const message = error?.message || error?.name || "";
   if (code.includes("email-already-in-use")) return "이미 가입된 이메일이에요";
   if (code.includes("invalid-email")) return "이메일 형식을 확인해 주세요";
   if (code.includes("weak-password")) return "비밀번호는 6자 이상이어야 해요";
+  if (code.includes("operation-not-allowed")) return "Firebase 이메일/비밀번호 로그인을 사용 설정해 주세요";
+  if (code.includes("unauthorized-domain")) return "Firebase 승인된 도메인에 현재 사이트를 추가해 주세요";
   if (code.includes("user-not-found") || code.includes("wrong-password") || code.includes("invalid-credential")) {
     return "아이디/이메일 또는 비밀번호가 맞지 않아요";
   }
+  if (code.includes("permission-denied")) return "Firestore 규칙 때문에 저장/조회가 막혔어요";
+  if (code.includes("unavailable")) return "Firestore 연결이 불안정해요. 잠시 후 다시 시도해 주세요";
   if (code.includes("network-request-failed")) return "네트워크 연결을 확인해 주세요";
-  return "Firebase 인증 중 문제가 생겼어요";
+  if (message.includes("Firebase 초기화 시간 초과")) return "Firebase 연결이 늦어요. 인터넷 연결을 확인하고 잠시 후 다시 눌러 주세요";
+  if (message.includes("Missing or insufficient permissions")) return "Firestore 규칙 때문에 저장/조회가 막혔어요";
+  if (message.includes("Failed to fetch") || message.includes("NetworkError")) return "Firebase 파일을 불러오지 못했어요. 인터넷 연결을 확인해 주세요";
+  return `Firebase 오류: ${code || message || "알 수 없는 오류"}`;
 }
 
 async function resolveLoginEmail(idOrEmail) {
@@ -241,7 +269,8 @@ async function checkIdDuplicate() {
     }
   } catch (error) {
     console.error(error);
-    msg.textContent = "중복 확인에 실패했어요"; msg.className = "field-msg err";
+    msg.textContent = firebaseAuthMessage(error);
+    msg.className = "field-msg err";
   }
 }
 function sendVerifyCode() {
@@ -605,19 +634,57 @@ function calibrateLength(rawMm) {
 }
 function recommendBrands(footLenMm) {
   const r5 = (n) => Math.round(n / 5) * 5;
-  return {
+  const result = {
     nike: r5(footLenMm + BRAND_OFFSETS.nike),
     adidas: r5(footLenMm + BRAND_OFFSETS.adidas),
     newbalance: r5(footLenMm + BRAND_OFFSETS.newbalance),
     converse: r5(footLenMm + BRAND_OFFSETS.converse),
   };
+  Object.entries(BRAND_SIZE_OFFSETS).forEach(([brand, offset]) => {
+    result[brand] = r5(footLenMm + offset);
+  });
+  return result;
+}
+
+const WIDTH_SIZE_TABLE = {
+  220: { D: [209, 212], E: [213, 216], EE: [217, 220], EEE: [221, 224], EEEE: [225, 228] },
+  225: { D: [213, 216], E: [217, 220], EE: [221, 224], EEE: [225, 228], EEEE: [229, 232] },
+  230: { D: [217, 220], E: [221, 224], EE: [225, 228], EEE: [229, 232], EEEE: [233, 236] },
+  235: { D: [221, 224], E: [225, 228], EE: [229, 232], EEE: [233, 236], EEEE: [237, 240] },
+  240: { D: [225, 228], E: [229, 232], EE: [233, 236], EEE: [237, 240], EEEE: [241, 244] },
+  245: { D: [229, 232], E: [233, 236], EE: [237, 240], EEE: [241, 244], EEEE: [245, 248] },
+  250: { D: [233, 236], E: [237, 240], EE: [241, 244], EEE: [245, 248], EEEE: [249, 252] },
+  255: { D: [237, 240], E: [241, 244], EE: [245, 248], EEE: [249, 252], EEEE: [253, 256] },
+  260: { D: [241, 244], E: [245, 248], EE: [249, 252], EEE: [253, 256], EEEE: [257, 260] },
+  265: { D: [245, 248], E: [249, 252], EE: [253, 256], EEE: [257, 260], EEEE: [261, 264] },
+};
+
+function getWidthTableLength(lengthMm) {
+  const rows = Object.keys(WIDTH_SIZE_TABLE).map(Number);
+  return rows.reduce((best, row) => Math.abs(row - lengthMm) < Math.abs(best - lengthMm) ? row : best, rows[0]);
+}
+
+function normalizeBallWidthForTable(widthMm) {
+  return Math.round(widthMm * BALL_WIDTH_TABLE_FACTOR * 10) / 10;
+}
+
+function getWidthGrade(lengthMm, widthMm) {
+  const row = WIDTH_SIZE_TABLE[getWidthTableLength(lengthMm)];
+  const normalized = normalizeBallWidthForTable(widthMm);
+  const grades = ["D", "E", "EE", "EEE", "EEEE"];
+  for (const grade of grades) {
+    const [min, max] = row[grade];
+    if (normalized >= min && normalized <= max) return { grade, normalized };
+  }
+  if (normalized < row.D[0]) return { grade: "D", normalized };
+  return { grade: "EEEE", normalized };
 }
 
 function classifyWidthType(lengthMm, widthMm) {
-  const ratio = widthMm / Math.max(lengthMm, 1);
-  if (ratio < 0.35) return "narrow";
-  if (ratio < 0.39) return "medium";
-  if (ratio < 0.43) return "wide";
+  const { grade } = getWidthGrade(lengthMm, widthMm);
+  if (grade === "D") return "narrow";
+  if (grade === "E") return "medium";
+  if (grade === "EE") return "wide";
   return "extraWide";
 }
 
@@ -626,11 +693,73 @@ function getWidthTypeInfo(result) {
   const key = WIDTH_TYPE_INFO[stored]
     ? stored
     : classifyWidthType(result.leftFoot.lengthMm, result.leftFoot.widthMm);
-  return { key, ...WIDTH_TYPE_INFO[key] };
+  const gradeInfo = getWidthGrade(result.leftFoot.lengthMm, result.leftFoot.widthMm);
+  return { key, ...WIDTH_TYPE_INFO[key], grade: gradeInfo.grade, tableWidthMm: gradeInfo.normalized };
+}
+
+const SHOE_BRAND_FIT = {
+  wide: ["NEW BALANCE", "ASICS", "HOKA", "SKECHERS"],
+  medium: ["MIZUNO", "BROOKS", "PUMA", "NEW BALANCE", "ASICS"],
+  narrow: ["NIKE", "CONVERSE", "VANS", "ADIDAS"],
+};
+
+const BRAND_FIT_REASON = {
+  "NEW BALANCE": "2E/4E 와이드 옵션이 많아 발볼이 넓은 편에 잘 맞아요.",
+  ASICS: "젤카야노, GT-2000 계열처럼 Extra Wide 선택지가 좋아요.",
+  HOKA: "본디, 클리프톤처럼 쿠셔닝과 Wide 옵션이 강점이에요.",
+  SKECHERS: "Relaxed Fit과 Wide Fit 라인이 많아 넉넉하게 신기 좋아요.",
+  MIZUNO: "동양인 발형에 맞는 여유로운 앞코와 발볼이 강점이에요.",
+  BROOKS: "Wide 옵션이 있어 보통부터 약간 넓은 발볼까지 맞추기 좋아요.",
+  PUMA: "스니커즈 라인은 무난하고 일부 모델은 발볼 여유가 있어요.",
+  NIKE: "날렵하고 타이트한 쉐입이라 칼발과 보통발에 잘 맞아요.",
+  CONVERSE: "좁고 길게 빠진 쉐입이라 칼발에 잘 어울려요.",
+  VANS: "날렵한 쉐입으로 좁은 발볼에 잘 맞아요.",
+  ADIDAS: "삼바, 가젤 등은 좁고 낮게 나오는 편이라 칼발에 좋아요.",
+};
+
+function getPreferredBrands(widthTypeKey) {
+  if (widthTypeKey === "wide" || widthTypeKey === "extraWide") return SHOE_BRAND_FIT.wide;
+  if (widthTypeKey === "medium") return SHOE_BRAND_FIT.medium;
+  return SHOE_BRAND_FIT.narrow;
+}
+
+function isBrandRecommendedForWidth(brand, widthTypeKey) {
+  return getPreferredBrands(widthTypeKey).includes(brand.toUpperCase());
+}
+
+function recommendSizeForBrand(footLenMm, brand) {
+  const r5 = (n) => Math.round(n / 5) * 5;
+  const normalized = brand.toUpperCase();
+  return r5(footLenMm + (BRAND_SIZE_OFFSETS[normalized] ?? 5));
+}
+
+function renderRecommendedSizes(result, widthType) {
+  const box = document.querySelector(".meta-brands");
+  if (!box) return;
+  const brands = getPreferredBrands(widthType.key);
+  box.innerHTML = brands.map((brand) => `
+    <div>
+      <span class="brand-name">${brand}</span>
+      <span>${recommendSizeForBrand(result.leftFoot.lengthMm, brand)}mm</span>
+    </div>
+  `).join("");
 }
 
 function shouldExcludeBrandForWidth(brand, widthTypeKey) {
-  return (widthTypeKey === "wide" || widthTypeKey === "extraWide") && brand.toLowerCase() === "adidas";
+  const normalized = brand.toUpperCase();
+  return !isBrandRecommendedForWidth(normalized, widthTypeKey);
+}
+
+function shoeFitScore(product, widthTypeKey) {
+  const preferred = getPreferredBrands(widthTypeKey);
+  const brandIndex = preferred.indexOf(product.brand);
+  const brandScore = brandIndex >= 0 ? 80 - brandIndex * 8 : 30;
+  const tag = product.tag || "";
+  let featureScore = 0;
+  if ((widthTypeKey === "wide" || widthTypeKey === "extraWide") && /와이드|안정|쿠셔닝/.test(tag)) featureScore += 14;
+  if (widthTypeKey === "medium" && /통기|반발|안정|데일리/.test(tag)) featureScore += 10;
+  if (widthTypeKey === "narrow" && /데일리|클래식|가벼움|경량/.test(tag)) featureScore += 12;
+  return brandScore + featureScore + (product.match || 0) / 10;
 }
 
 // ===== Capture flow =====
@@ -761,12 +890,15 @@ async function startAnalysis() {
     const calLen = calibrateLength(r.lengthMm);
     const brands = recommendBrands(calLen);
     const widthType = classifyWidthType(calLen, r.ballWidthMm);
+    const widthGrade = getWidthGrade(calLen, r.ballWidthMm);
     const result = {
       date: new Date().toISOString(),
       leftFoot:  { lengthMm: calLen, widthMm: r.ballWidthMm },
       rightFoot: { lengthMm: calLen, widthMm: r.ballWidthMm },
       archIndex: r.archIndex, archType: r.archType,
       widthType,
+      widthGrade: widthGrade.grade,
+      tableWidthMm: widthGrade.normalized,
       recommendations: brands,
     };
     state.lastResult = result;
@@ -810,12 +942,10 @@ function renderResult(result, previewCanvas) {
   $("r-right-w").textContent  = result.rightFoot.widthMm.toFixed(1);
   const widthType = getWidthTypeInfo(result);
   $("r-width-type").textContent = widthType.label;
-  $("r-width-desc").textContent = `${widthType.detail} · ${widthType.desc}`;
-  $("r-foot-type").textContent= `${widthType.label} · ${FOOT_TYPE_LABEL[result.archType]}`;
-  $("r-nike").textContent       = result.recommendations.nike + "mm";
-  $("r-adidas").textContent     = shouldExcludeBrandForWidth("adidas", widthType.key) ? "추천 제외" : result.recommendations.adidas + "mm";
-  $("r-newbalance").textContent = result.recommendations.newbalance + "mm";
-  $("r-converse").textContent   = result.recommendations.converse + "mm";
+  $("result-type-card")?.classList.toggle("is-long-type", widthType.label.length >= 9);
+  $("r-width-desc").textContent = `${widthType.detail} · ${widthType.grade} 기준 · 표준 발볼 ${widthType.tableWidthMm.toFixed(1)}mm`;
+  $("r-foot-type").textContent= `${widthType.label}(${widthType.grade}) · ${FOOT_TYPE_LABEL[result.archType]}`;
+  renderRecommendedSizes(result, widthType);
 }
 
 const RECOMMEND_PRODUCTS = [
@@ -836,6 +966,39 @@ const RECOMMEND_PRODUCTS = [
   { category: "training", brand: "UNDER ARMOUR", name: "Reign 6", price: "₩139,000", match: 88, tag: "접지력", tone: "dark" },
   { category: "training", brand: "ON", name: "Cloud X 4", price: "₩179,000", match: 87, tag: "경량", tone: "light" },
 ];
+
+RECOMMEND_PRODUCTS.push(
+  { category: "running", brand: "NEW BALANCE", name: "Fresh Foam X 1080 v13", price: "₩189,000", match: 94, tag: "쿠셔닝", tone: "light" },
+  { category: "running", brand: "NEW BALANCE", name: "Fresh Foam X More v4", price: "₩199,000", match: 93, tag: "와이드핏", tone: "dark" },
+  { category: "running", brand: "NEW BALANCE", name: "860 v14", price: "₩169,000", match: 92, tag: "안정감", tone: "light" },
+  { category: "sneakers", brand: "NEW BALANCE", name: "574 Core", price: "₩119,000", match: 90, tag: "데일리", tone: "dark" },
+  { category: "running", brand: "NIKE", name: "Vomero 17", price: "₩189,000", match: 93, tag: "쿠셔닝", tone: "dark" },
+  { category: "running", brand: "NIKE", name: "Structure 25", price: "₩159,000", match: 91, tag: "안정감", tone: "light" },
+  { category: "training", brand: "NIKE", name: "Free Metcon 6", price: "₩159,000", match: 90, tag: "접지력", tone: "dark" },
+  { category: "sneakers", brand: "NIKE", name: "P-6000", price: "₩129,000", match: 89, tag: "데일리", tone: "light" },
+  { category: "running", brand: "ASICS", name: "GT-2000 12", price: "₩159,000", match: 94, tag: "안정감", tone: "light" },
+  { category: "running", brand: "ASICS", name: "Gel-Nimbus 26", price: "₩189,000", match: 93, tag: "쿠셔닝", tone: "dark" },
+  { category: "running", brand: "ASICS", name: "Gel-Cumulus 26", price: "₩159,000", match: 91, tag: "통기성", tone: "light" },
+  { category: "training", brand: "ASICS", name: "Gel-Resolution 9", price: "₩169,000", match: 90, tag: "지지력", tone: "dark" },
+  { category: "sneakers", brand: "ASICS", name: "Japan S", price: "₩109,000", match: 88, tag: "데일리", tone: "light" },
+  { category: "sneakers", brand: "CONVERSE", name: "Chuck 70", price: "₩99,000", match: 89, tag: "클래식", tone: "dark" },
+  { category: "sneakers", brand: "CONVERSE", name: "Weapon CX", price: "₩119,000", match: 88, tag: "쿠셔닝", tone: "light" },
+  { category: "sneakers", brand: "CONVERSE", name: "Star Player 76", price: "₩89,000", match: 87, tag: "데일리", tone: "dark" },
+  { category: "training", brand: "CONVERSE", name: "All Star BB Trilliant", price: "₩139,000", match: 86, tag: "지지력", tone: "light" },
+  { category: "sneakers", brand: "CONVERSE", name: "One Star Pro", price: "₩109,000", match: 86, tag: "내구성", tone: "dark" },
+  { category: "running", brand: "HOKA", name: "Bondi 8 Wide", price: "₩219,000", match: 95, tag: "와이드핏", tone: "dark" },
+  { category: "running", brand: "HOKA", name: "Arahi 7 Wide", price: "₩199,000", match: 93, tag: "안정감", tone: "light" },
+  { category: "running", brand: "HOKA", name: "Gaviota 5 Wide", price: "₩229,000", match: 92, tag: "지지력", tone: "dark" },
+  { category: "training", brand: "HOKA", name: "Solimar", price: "₩159,000", match: 89, tag: "경량", tone: "light" },
+  { category: "running", brand: "BROOKS", name: "Adrenaline GTS 23", price: "₩179,000", match: 94, tag: "안정감", tone: "light" },
+  { category: "running", brand: "BROOKS", name: "Glycerin 21", price: "₩189,000", match: 93, tag: "쿠셔닝", tone: "dark" },
+  { category: "running", brand: "BROOKS", name: "Dyad 11", price: "₩169,000", match: 92, tag: "와이드핏", tone: "light" },
+  { category: "running", brand: "BROOKS", name: "Launch 10", price: "₩129,000", match: 89, tag: "반발감", tone: "dark" },
+  { category: "sneakers", brand: "SKECHERS", name: "D'Lites 4.0 Wide", price: "₩109,000", match: 94, tag: "와이드핏", tone: "light" },
+  { category: "running", brand: "SKECHERS", name: "Go Run Max Cushioning", price: "₩139,000", match: 93, tag: "쿠셔닝", tone: "dark" },
+  { category: "training", brand: "SKECHERS", name: "Arch Fit 2.0", price: "₩119,000", match: 91, tag: "안정감", tone: "light" },
+  { category: "sneakers", brand: "SKECHERS", name: "Relaxed Fit Expected", price: "₩99,000", match: 90, tag: "와이드핏", tone: "dark" }
+);
 
 function shoeIllustration(tone) {
   const upper = tone === "light" ? "#e8e5dc" : "#2f302b";
@@ -872,6 +1035,23 @@ function renderRecommendSummary(result, widthType, visibleCount) {
   `;
 }
 
+function renderRecommendSummary(result, widthType, visibleCount) {
+  const summary = $("recommend-summary");
+  if (!summary) return;
+  const footType = result && widthType ? `${widthType.label} · ${FOOT_TYPE_LABEL[result.archType]}` : "측정 결과 기반";
+  const preferred = widthType ? getPreferredBrands(widthType.key).join(" · ") : "";
+  const fitNote = widthType
+    ? `<span>${preferred} 중심으로 추천했어요</span>`
+    : "<span>측정값과 브랜드 핏을 같이 반영했어요</span>";
+  summary.innerHTML = `
+    <div>
+      <strong>${footType}</strong>
+      <p>${categoryLabel(state.recommendCategory)} ${visibleCount}개 추천</p>
+    </div>
+    ${fitNote}
+  `;
+}
+
 function renderRecommendBrandChips(products) {
   const chips = $("recommend-brand-chips");
   if (!chips) return;
@@ -901,9 +1081,29 @@ function renderShoeRecommendations(category = state.recommendCategory || "all") 
     if (state.recommendBrand && p.brand !== state.recommendBrand) return false;
     if (!keyword) return true;
     return `${p.brand} ${p.name} ${p.tag}`.toLowerCase().includes(keyword);
+  }).sort((a, b) => {
+    if (!widthType) return (b.match || 0) - (a.match || 0);
+    return shoeFitScore(b, widthType.key) - shoeFitScore(a, widthType.key);
   });
-  renderRecommendSummary(result, widthType, products.length);
-  if (!products.length) {
+  const displayProducts = products.slice();
+  if (!keyword && displayProducts.length > 0 && displayProducts.length < 5) {
+    const used = new Set(displayProducts);
+    const fallbackProducts = RECOMMEND_PRODUCTS.filter((p) => {
+      if (widthType && shouldExcludeBrandForWidth(p.brand, widthType.key)) return false;
+      if (state.recommendBrand && p.brand !== state.recommendBrand) return false;
+      return true;
+    }).sort((a, b) => {
+      if (!widthType) return (b.match || 0) - (a.match || 0);
+      return shoeFitScore(b, widthType.key) - shoeFitScore(a, widthType.key);
+    });
+    fallbackProducts.forEach((p) => {
+      if (displayProducts.length >= 5 || used.has(p)) return;
+      displayProducts.push(p);
+      used.add(p);
+    });
+  }
+  renderRecommendSummary(result, widthType, displayProducts.length);
+  if (!displayProducts.length) {
     list.innerHTML = `
       <div class="recommend-empty">
         <strong>조건에 맞는 신발이 없어요</strong>
@@ -912,7 +1112,7 @@ function renderShoeRecommendations(category = state.recommendCategory || "all") 
     `;
     return;
   }
-  list.innerHTML = products.map((p) => `
+  list.innerHTML = displayProducts.map((p) => `
     <button class="recommend-product" type="button" data-product-index="${RECOMMEND_PRODUCTS.indexOf(p)}">
       <div class="shoe-art">${shoeIllustration(p.tone)}</div>
       <div class="product-copy">
@@ -1004,15 +1204,27 @@ function renderShoeDetail(productIndex) {
   state.currentProductIndex = productIndex;
   const widthType = getWidthTypeInfo(result);
   const sizeKey = getBrandSizeKey(product.brand);
-  const recommendedSize = result.recommendations[sizeKey] || result.recommendations.nike;
+  const recommendedSize = recommendSizeForBrand(result.leftFoot.lengthMm, product.brand)
+    || result.recommendations[sizeKey]
+    || result.recommendations.nike;
   $("detail-shoe-art").innerHTML = shoeIllustration(product.tone);
   $("detail-product-name").textContent = product.name;
-  $("detail-product-price").textContent = product.price;
+  $("detail-product-price").innerHTML = `${product.price}<span class="detail-delivery-badge">무료배송</span>`;
+  $("detail-logo").innerHTML = `<img src="icons/solemate-logo.svg" alt="" />`;
   $("detail-brand-name").textContent = product.brand;
-  $("detail-size-name").textContent = `${recommendedSize}mm`;
+  $("detail-size-name").innerHTML = `${recommendedSize}<span>정사이즈예요</span>`;
   $("detail-size-mm").textContent = `${result.leftFoot.lengthMm.toFixed(1)}mm x ${result.leftFoot.widthMm.toFixed(1)}mm`;
-  $("detail-feature").textContent = `${product.tag} 중심의 ${product.category === "running" ? "러닝화" : product.category === "training" ? "운동화" : "스니커즈"}입니다.`;
-  $("detail-reason").textContent = `${widthType.label} 발볼과 ${FOOT_TYPE_LABEL[result.archType]} 특성을 고려했을 때 ${product.brand} ${product.name}의 착화 안정감이 잘 맞습니다.`;
+  $("detail-feature").innerHTML = `
+    <div class="detail-feature-chip"><span>⌁</span><strong>쿠션 중상</strong><small>편안한 착화감</small></div>
+    <div class="detail-feature-chip"><span>≋</span><strong>${product.tag}</strong><small>발 안정감</small></div>
+    <div class="detail-feature-chip"><span>◌</span><strong>${product.category === "running" ? "러닝화" : product.category === "training" ? "운동화" : "스니커즈"}</strong><small>일상 매치</small></div>
+    <div class="detail-feature-chip"><span>⌾</span><strong>미끄럼 방지</strong><small>안정적인 아웃솔</small></div>
+  `;
+  $("detail-reason").innerHTML = `
+    <div class="detail-reason-item"><span>◒</span><div><strong>발볼 유형에 맞아요</strong><p>${widthType.label} 발볼과 ${FOOT_TYPE_LABEL[result.archType]} 특성을 고려했어요.</p></div></div>
+    <div class="detail-reason-item"><span>〰</span><div><strong>브랜드 핏이 맞아요</strong><p>${BRAND_FIT_REASON[product.brand] || `${product.brand}의 착화감과 실측값을 함께 반영했어요.`}</p></div></div>
+    <div class="detail-reason-item"><span>◇</span><div><strong>추천 신발과 스타일링 연결</strong><p>다음 단계에서 이 신발에 맞는 착장을 함께 볼 수 있어요.</p></div></div>
+  `;
   updateHeartButton(productIndex);
   return true;
 }
@@ -1167,37 +1379,150 @@ OUTFIT_RECOMMENDATIONS.push(
   }
 );
 
+const THUG_CLUB_PRODUCTS = [
+  { name: "Mohican Leather Denim Pants", price: "528,000원", image: "https://thug-club.com/web/product/medium/202312/3f57b6d1121450bc530669906b1a2ebd.png", url: "https://thug-club.com/product/mohican-leather-denim-pants/180/category/82/display/1/" },
+  { name: "Cave Denim Vest", price: "518,000원", image: "https://thug-club.com/web/product/medium/202401/8159a7e27b5fcef3a887bf51c5ca4507.png", url: "https://thug-club.com/product/cave-denim-vest/196/category/82/display/1/" },
+  { name: "Castle Cowboy Pants", price: "396,000원", image: "https://thug-club.com/web/product/medium/202401/d4aab0cda36d25ff54fbc933ca7b52e4.png", url: "https://thug-club.com/product/castle-cowboy-pants/190/category/82/display/1/" },
+  { name: "TC Pin Denim Pants", price: "388,000원", image: "https://thug-club.com/web/product/medium/202402/3337401f5e5bf38d029d768e6d1f6de6.png", url: "https://thug-club.com/product/tc-pin-denim-pants/194/category/82/display/1/" },
+  { name: "Rock Hoodie", price: "298,000원", image: "https://thug-club.com/web/product/medium/202402/b5bcfef0ff2c94a49c01f9bc8bae3491.png", url: "https://thug-club.com/product/rock-hoodie/211/category/82/display/1/" },
+  { name: "Double knee Damage Shorts", price: "238,000원", image: "https://thug-club.com/web/product/medium/202402/24227de2e10c42eff7df33119d1be1a1.png", url: "https://thug-club.com/product/double-knee-damage-shorts/198/category/82/display/1/" },
+  { name: "Hell Cowboy Jacket", price: "2,156,000원", image: "https://thug-club.com/web/product/medium/202402/b3ef78c0a1036a214fb46179f68d1832.png", url: "https://thug-club.com/product/hell-cowboy-jacket/209/category/82/display/1/" },
+  { name: "TC Leather All Black Denim Pants2", price: "378,000원", image: "https://thug-club.com/web/product/medium/202312/4ecd8ac8c8dd80b49733505822ad100c.png", url: "https://thug-club.com/product/tc-leather-all-black-denim-pants2/184/category/82/display/1/" },
+  { name: "TC Leather Black Denim Pants2", price: "378,000원", image: "https://thug-club.com/web/product/medium/202312/5b90cdb00f7604aaf4078dab5614beaf.png", url: "https://thug-club.com/product/tc-leather-black-denim-pants2/183/category/82/display/1/" },
+  { name: "TC Leather Washing Denim Pants2", price: "378,000원", image: "https://thug-club.com/web/product/medium/202312/1505d56dfec7a0a0b281fceccc6eca5c.png", url: "https://thug-club.com/product/tc-leather-washing-denim-pants2/182/category/82/display/1/" },
+  { name: "Full Leather Dragon Messenger Bag", price: "720,000원", image: "https://thug-club.com/web/product/medium/202401/0a85335ae95f5abcdb3f4c49c8df590b.png", url: "https://thug-club.com/product/full-leather-dragon-messenger-bag/185/category/82/display/1/" },
+  { name: "Castle Cowboy Messenger Bag", price: "580,000원", image: "https://thug-club.com/web/product/medium/202312/2320dcc46153ec96d976545031306952.png", url: "https://thug-club.com/product/castle-cowboy-messenger-bag/181/category/82/display/1/" },
+  { name: "Claw jacket", price: "498,000원", image: "https://thug-club.com/web/product/medium/202402/da5f4d2ed5f6ef85ceae9c31f814723f.png", url: "https://thug-club.com/product/claw-jacket/205/category/82/display/1/" },
+  { name: "Denim Zip-up Hoodie", price: "468,000원", image: "https://thug-club.com/web/product/medium/202402/c828706dd00036816bc95ae815886567.png", url: "https://thug-club.com/product/denim-zip-up-hoodie/199/category/82/display/1/" },
+  { name: "TC Pin Denim Jacket", price: "418,000원", image: "https://thug-club.com/web/product/medium/202402/40d36a9d6e6096f43a81ee719d2a5483.png", url: "https://thug-club.com/product/tc-pin-denim-jacket/195/category/82/display/1/" },
+  { name: "Tribal Tree Denim Jacket", price: "418,000원", image: "https://thug-club.com/web/product/medium/202310/93d265ac936d163d95ba0442c1a18de4.png", url: "https://thug-club.com/product/tribal-tree-denim-jacket/159/category/82/display/1/" },
+  { name: "Tribal Tree Denim Jacket", price: "418,000원", image: "https://thug-club.com/web/product/medium/202311/bff763f3f17f79ac3357884c91737628.png", url: "https://thug-club.com/product/tribal-tree-denim-jacket/158/category/82/display/1/" },
+  { name: "Tribal Tree Denim Pants", price: "388,000원", image: "https://thug-club.com/web/product/medium/202310/5f0f5394ca9f54237be5ab5475d958c8.png", url: "https://thug-club.com/product/tribal-tree-denim-pants/161/category/82/display/1/" },
+  { name: "Tribal Tree Denim Pants", price: "388,000원", image: "https://thug-club.com/web/product/medium/202310/eeeb86e0fc3b3e3dff803518e5dd2f7a.png", url: "https://thug-club.com/product/tribal-tree-denim-pants/160/category/82/display/1/" },
+  { name: "Chain Stitch Denim Pants", price: "388,000원", image: "https://thug-club.com/web/product/medium/202305/365324681c90925395ba204fc5d053ff.png", url: "https://thug-club.com/product/chain-stitch-denim-pants/119/category/82/display/1/" },
+  { name: "Mini Dragon Messenger Bag", price: "385,000원", image: "https://thug-club.com/web/product/medium/202401/ad3cafff23ae9991a325bcce797866fd.png", url: "https://thug-club.com/product/mini-dragon-messenger-bag/186/category/82/display/1/" },
+  { name: "Line GOB pants", price: "378,000원", image: "https://thug-club.com/web/product/medium/202402/2c7272bfbf3e4bc5b9fc56533ee04377.png", url: "https://thug-club.com/product/line-gob-pants/206/category/82/display/1/" },
+  { name: "Dem Sound Zip-up", price: "368,000원", image: "https://thug-club.com/web/product/medium/202401/541c3705acfe6d79b4526fc093418997.png", url: "https://thug-club.com/product/dem-sound-zip-up/191/category/82/display/1/" },
+  { name: "Gladiator Hooded Vest", price: "358,000원", image: "https://thug-club.com/web/product/medium/202402/c08772637121d009957bdceb4cb79425.png", url: "https://thug-club.com/product/gladiator-hooded-vest/207/category/82/display/1/" },
+  { name: "Denim Web Cap", price: "305,000원", image: "https://thug-club.com/web/product/medium/202311/95b9533f0ecd0b418fc54d87a941a85d.png", url: "https://thug-club.com/product/denim-web-cap/149/category/82/display/1/" },
+  { name: "Glady shorts", price: "288,000원", image: "https://thug-club.com/web/product/medium/202402/ba0e94864f8f9755068805a7327dbb0a.png", url: "https://thug-club.com/product/glady-shorts/208/category/82/display/1/" },
+  { name: "Rock Hooded Vest", price: "238,000원", image: "https://thug-club.com/web/product/medium/202402/3c0a9db0f414b76f6d6caace681cf62d.png", url: "https://thug-club.com/product/rock-hooded-vest/210/category/82/display/1/" },
+  { name: "Tribal Tree Sleeve", price: "211,000원", image: "https://thug-club.com/web/product/medium/202402/041bba4ea4eb535b7c997539ad88c6b1.png", url: "https://thug-club.com/product/tribal-tree-sleeve/217/category/82/display/1/" },
+  { name: "Dead Line T-shirt", price: "198,000원", image: "https://thug-club.com/web/product/medium/202402/3718f7ff4a661d0557a554257692e778.png", url: "https://thug-club.com/product/dead-line-t-shirt/204/category/82/display/1/" },
+  { name: "Back C Mesh Sleeve", price: "188,000원", image: "https://thug-club.com/web/product/medium/202310/8f6ff352640b9ecf61d229590508a90c.png", url: "https://thug-club.com/product/back-c-mesh-sleeve/154/category/82/display/1/" },
+  { name: "TC Life Cap", price: "168,000원", image: "https://thug-club.com/web/product/medium/202307/2ce7ff849c5c707ad17bdd560575353b.png", url: "https://thug-club.com/product/tc-life-cap/140/category/82/display/1/" },
+  { name: "TC Life Cap", price: "168,000원", image: "https://thug-club.com/web/product/medium/202307/16073831910146b69fb523782493b8d8.png", url: "https://thug-club.com/product/tc-life-cap/138/category/82/display/1/" },
+  { name: "TC Mesh Shorts", price: "152,000원", image: "https://thug-club.com/web/product/medium/202402/b3ec738f6f1fdd4734910c3ae4e8b325.png", url: "https://thug-club.com/product/tc-mesh-shorts/213/category/82/display/1/" },
+  { name: "Cave T-shirts", price: "135,000원", image: "https://thug-club.com/web/product/medium/202402/3ac353e8ae27a1f85eb824f686ffeb67.png", url: "https://thug-club.com/product/cave-t-shirts/203/category/82/display/1/" },
+  { name: "Sword Cap", price: "115,000원", image: "https://thug-club.com/web/product/medium/202401/5f10461eb36d2f036d51e9ed4ed1ab84.png", url: "https://thug-club.com/product/sword-cap/189/category/82/display/1/" },
+];
+
+function parseWon(price) {
+  return Number(String(price).replace(/[^\d]/g, "")) || 0;
+}
+
+function getClothesCategory(item) {
+  const name = item.name.toLowerCase();
+  if (name.includes("bag")) return "bag";
+  if (name.includes("cap") || name.includes("sleeve")) return "acc";
+  return "apparel";
+}
+
+function getVisibleClothesProducts() {
+  const keyword = state.clothesSearch.trim().toLowerCase();
+  let products = THUG_CLUB_PRODUCTS.map((item, index) => ({ ...item, originalIndex: index }));
+  if (state.clothesCategory !== "all") {
+    products = products.filter((item) => getClothesCategory(item) === state.clothesCategory);
+  }
+  if (keyword) {
+    products = products.filter((item) => item.name.toLowerCase().includes(keyword));
+  }
+  if (state.clothesMenu === "sale") {
+    products = products.filter((item) => parseWon(item.price) <= 200000);
+  }
+  if (state.clothesMenu === "best") {
+    products = products.slice().sort((a, b) => parseWon(b.price) - parseWon(a.price));
+  } else if (state.clothesMenu === "designer") {
+    products = products.slice().sort((a, b) => a.name.localeCompare(b.name));
+  } else if (state.clothesMenu === "showindow") {
+    products = products.slice().sort((a, b) => getClothesCategory(a).localeCompare(getClothesCategory(b)) || parseWon(b.price) - parseWon(a.price));
+  }
+  return products;
+}
+
+function syncClothesControls() {
+  $$("[data-clothes-menu]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.clothesMenu === state.clothesMenu);
+  });
+  $$("[data-clothes-mode]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.clothesMode === state.clothesMode);
+  });
+  $$("[data-clothes-category]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.clothesCategory === state.clothesCategory);
+  });
+}
+
 function renderClothesRecommendations() {
   const list = $("clothes-list");
   if (!list) return;
-  list.innerHTML = OUTFIT_RECOMMENDATIONS.map((outfit, index) => `
-    <button class="clothes-card" type="button" data-outfit-index="${index}">
-      <div class="clothes-swatch" style="background:linear-gradient(135deg, ${outfit.colors.outer}, ${outfit.colors.top} 50%, ${outfit.colors.bottom});"></div>
+  syncClothesControls();
+  const products = getVisibleClothesProducts();
+  if (state.clothesMode === "brand") {
+    const categories = [
+      ["APPAREL", THUG_CLUB_PRODUCTS.filter((item) => getClothesCategory(item) === "apparel").length],
+      ["BAG", THUG_CLUB_PRODUCTS.filter((item) => getClothesCategory(item) === "bag").length],
+      ["ACC", THUG_CLUB_PRODUCTS.filter((item) => getClothesCategory(item) === "acc").length],
+    ];
+    list.innerHTML = `
+      <button class="clothes-brand-card" type="button" data-clothes-mode="product">
+        <strong>THUG CLUB</strong>
+        <span>${THUG_CLUB_PRODUCTS.length}개 상품</span>
+        <p>추천 신발과 함께 매치하기 좋은 스트릿 무드 브랜드</p>
+      </button>
+      ${categories.map(([label, count]) => `
+        <button class="clothes-brand-card small" type="button" data-clothes-category="${label.toLowerCase()}">
+          <strong>${label}</strong>
+          <span>${count}개</span>
+        </button>
+      `).join("")}
+    `;
+    return;
+  }
+  if (!products.length) {
+    list.innerHTML = `
+      <div class="clothes-empty">
+        <strong>상품이 없어요</strong>
+        <p>다른 카테고리나 메뉴를 눌러보세요.</p>
+      </div>
+    `;
+    return;
+  }
+  list.innerHTML = products.map((item, index) => `
+    <button class="clothes-card product-card" type="button" data-outfit-index="${index}">
+      <span class="clothes-rank">${index + 1}</span>
+      <img class="clothes-product-image" src="${item.image}" alt="${item.name}" loading="lazy" />
       <div>
-        <h4>${outfit.title}</h4>
-        <p>${outfit.items.map(([, value]) => value).slice(0, 3).join(", ")}</p>
+        <h4>${item.name}</h4>
+        <p>${item.price}</p>
       </div>
     </button>
   `).join("");
 }
 
 function renderOutfitDetail(index) {
-  const outfit = OUTFIT_RECOMMENDATIONS[index] || OUTFIT_RECOMMENDATIONS[0];
-  $("outfit-title").textContent = outfit.title;
-  $("outfit-desc").textContent = outfit.desc;
-  $("outfit-reason").textContent = outfit.reason;
+  const item = getVisibleClothesProducts()[index] || THUG_CLUB_PRODUCTS[index] || THUG_CLUB_PRODUCTS[0];
+  $("outfit-title").textContent = item.name;
+  $("outfit-desc").textContent = item.price;
+  $("outfit-reason").textContent = "추천 신발과 함께 스트릿 무드로 매치하기 좋은 THUG CLUB 상품입니다.";
   $("outfit-visual").innerHTML = `
-    <div class="outfit-figure">
-      <div class="outfit-head"></div>
-      <div class="outfit-outer" style="background:${outfit.colors.outer}"></div>
-      <div class="outfit-top" style="background:${outfit.colors.top}"></div>
-      <div class="outfit-bottom" style="background:${outfit.colors.bottom}"></div>
-      <div class="outfit-shoes"></div>
-    </div>
+    <img class="outfit-product-image" src="${item.image}" alt="${item.name}" />
   `;
-  $("outfit-items").innerHTML = outfit.items.map(([label, value]) => `
-    <div class="outfit-item"><span>${label}</span><span>${value}</span></div>
-  `).join("");
+  $("outfit-items").innerHTML = `
+    <div class="outfit-item"><span>브랜드</span><span>THUG CLUB</span></div>
+    <div class="outfit-item"><span>상품명</span><span>${item.name}</span></div>
+    <div class="outfit-item"><span>가격</span><span>${item.price}</span></div>
+    <a class="outfit-shop-link" href="${item.url}" target="_blank" rel="noopener noreferrer">상품 보러가기</a>
+  `;
 }
 
 // ===== My page =====
@@ -1331,7 +1656,67 @@ function bind() {
   }
   const heartBtn = document.querySelector(".detail-heart");
   if (heartBtn) heartBtn.addEventListener("click", toggleCurrentShoeLike);
+  const detailBrandMore = $("detail-brand-more");
+  if (detailBrandMore) {
+    detailBrandMore.addEventListener("click", () => {
+      const product = RECOMMEND_PRODUCTS[state.currentProductIndex];
+      if (!product) return;
+      state.recommendCategory = "all";
+      state.recommendBrand = product.brand;
+      state.recommendSearch = "";
+      const searchInput = $("recommend-search");
+      if (searchInput) searchInput.value = "";
+      $$(".recommend-tab").forEach((t) => t.classList.toggle("active", t.dataset.category === "all"));
+      renderShoeRecommendations("all");
+      showScreen("shoe-recommendations");
+      const list = $("recommend-list");
+      if (list) list.scrollTop = 0;
+    });
+  }
   renderClothesRecommendations();
+  const clothesScreen = document.querySelector('[data-screen="clothes-recommendations"]');
+  if (clothesScreen) {
+    clothesScreen.addEventListener("click", (e) => {
+      const menuButton = e.target.closest("[data-clothes-menu]");
+      if (menuButton) {
+        state.clothesMenu = menuButton.dataset.clothesMenu || "new";
+        renderClothesRecommendations();
+        $("clothes-list")?.scrollTo({ top: 0, behavior: "instant" });
+        return;
+      }
+      const modeButton = e.target.closest("[data-clothes-mode]");
+      if (modeButton) {
+        state.clothesMode = modeButton.dataset.clothesMode || "product";
+        renderClothesRecommendations();
+        $("clothes-list")?.scrollTo({ top: 0, behavior: "instant" });
+        return;
+      }
+      const categoryButton = e.target.closest("[data-clothes-category]");
+      if (categoryButton) {
+        state.clothesMode = "product";
+        state.clothesCategory = categoryButton.dataset.clothesCategory || "all";
+        renderClothesRecommendations();
+        $("clothes-list")?.scrollTo({ top: 0, behavior: "instant" });
+      }
+    });
+  }
+  const shopSearchToggle = $("shop-search-toggle");
+  if (shopSearchToggle) {
+    shopSearchToggle.addEventListener("click", () => {
+      const panel = $("shop-search-panel");
+      if (!panel) return;
+      panel.hidden = !panel.hidden;
+      if (!panel.hidden) $("clothes-search")?.focus();
+    });
+  }
+  const clothesSearch = $("clothes-search");
+  if (clothesSearch) {
+    clothesSearch.addEventListener("input", () => {
+      state.clothesSearch = clothesSearch.value;
+      state.clothesMode = "product";
+      renderClothesRecommendations();
+    });
+  }
   const clothesList = $("clothes-list");
   if (clothesList) {
     clothesList.addEventListener("click", (e) => {
