@@ -19,6 +19,7 @@
 :root {
   --app-width: 390px;
   --app-height: 844px;
+  --safe-bottom: max(18px, env(safe-area-inset-bottom));
   --bg: #fdf4e3;
   --bg-2: #f9ecd4;
   --card: #ffffff;
@@ -59,7 +60,7 @@ body {
   min-height: 100dvh;
   background: linear-gradient(180deg, #fdf4e3 0%, #f9ecd4 100%);
   padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: 0;
   display: flex;
   justify-content: center;
   overflow: hidden;
@@ -70,10 +71,10 @@ input, select { font-family: inherit; }
 .page {
   width: var(--app-width);
   max-width: var(--app-width);
-  height: var(--app-height);
-  min-height: var(--app-height);
+  height: min(var(--app-height), 100dvh);
+  min-height: min(var(--app-height), 100dvh);
   margin: 0 auto;
-  padding: 16px 20px 20px;
+  padding: 16px 20px var(--safe-bottom);
   background: var(--bg);
   box-shadow: 0 0 60px rgba(120, 110, 80, 0.18);
   overflow: hidden;
@@ -119,7 +120,7 @@ input, select { font-family: inherit; }
 .start-wrap {
   background: var(--bg);
   border-radius: var(--radius-lg);
-  padding: 28px 28px 32px;
+  padding: 20px 26px calc(22px + var(--safe-bottom));
   text-align: center;
   height: 100%;
   min-height: 0;
@@ -129,9 +130,9 @@ input, select { font-family: inherit; }
 }
 .tagline {
   font-size: 21px; color: #6b6655;
-  margin: 8px 0 28px; line-height: 1.45; font-weight: 400;
+  margin: 6px 0 20px; line-height: 1.4; font-weight: 400;
 }
-.foot-illustration { width: 160px; height: 220px; margin: 8px auto 32px; opacity: 0.95; }
+.foot-illustration { width: 142px; height: 190px; margin: 4px auto 22px; opacity: 0.95; }
 .foot-illustration img, .foot-illustration svg { width: 100%; height: 100%; }
 
 .btn-primary, .btn-secondary {
@@ -988,14 +989,14 @@ select.text-input {
 /* ===== Shoe detail ===== */
 .shoe-detail-wrap {
   background: linear-gradient(180deg, #fff8ed 0%, #f9ecd4 100%);
-  padding: 16px 20px 74px;
+  padding: 16px 20px calc(92px + var(--safe-bottom));
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  scroll-padding-bottom: 82px;
+  scroll-padding-bottom: calc(92px + var(--safe-bottom));
 }
 .detail-brand-row {
   display: flex;
@@ -1309,8 +1310,9 @@ select.text-input {
   padding: 11px 14px;
   font-size: 14px;
   position: sticky;
-  bottom: 10px;
-  z-index: 5;
+  bottom: calc(14px + var(--safe-bottom));
+  z-index: 20;
+  pointer-events: auto;
 }
 
 /* ===== Clothes recommendations ===== */
@@ -1806,6 +1808,34 @@ select.text-input {
   background: white; border-radius: var(--radius-md);
   padding: 16px; margin: 12px 0 16px;
   box-shadow: var(--shadow-sm);
+}
+.mypage-wrap {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: calc(16px + var(--safe-bottom));
+}
+.mypage-wrap .brand-small {
+  flex: 0 0 auto;
+  margin: 8px 0 14px;
+}
+.mypage-wrap .screen-title {
+  flex: 0 0 auto;
+  margin: 0 0 18px;
+}
+.mypage-wrap #mp-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 8px 0 14px;
+}
+.mypage-wrap .result-actions {
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding-top: 4px;
+}
+.mypage-wrap .result-actions > button {
+  min-height: 46px;
 }
 .mp-row, .admin-row {
   display: flex; justify-content: space-between; align-items: center;
