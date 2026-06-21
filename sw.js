@@ -1,5 +1,5 @@
 /* Solemate Service Worker — offline-first caching for the app shell. */
-const CACHE = "solemate-v8";
+const CACHE = "solemate-v9";
 const ASSETS = [
   "./",
   "./index.html",
